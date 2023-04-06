@@ -9,16 +9,16 @@ from scipy.spatial.transform import Rotation as R
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--source_dir", default="/home/turin/Desktop/lizard_dataset_curated/2015/pcd15.pcd", type=str,
+    parser.add_argument("--source_dir", default="/home/turin/Desktop/lizard_dataset_curated/2016/pcd16.pcd", type=str,
                         help="Source Pcd Directory")
-    parser.add_argument("--target_dir", default="/home/turin/Desktop/lizard_dataset_curated/2014/pcd14.pcd", type=str,
+    parser.add_argument("--target_dir", default="/home/turin/Desktop/lizard_dataset_curated/2015/pcd15.pcd", type=str,
                         help="Target Pcd Directory")
-    parser.add_argument("registration", type=str, help="Either 'fast', 'global' or 'icp'")
+    parser.add_argument("registration", type=str, default='global_icp', help="Either 'fast', 'global', 'global_icp' or 'icp'")
     parser.add_argument("--voxel_size", type=float, default=0.1, help="User Defined Voxel_size 0.05 means 5cm for this "
                                                                       "dataset, initial value = .1m")
     parser.add_argument("--distance_threshold_mult", type=float, default=1.5, help="distance_threshold multiplier to "
                                                                                    "voxel size")
-    parser.add_argument("--noise", help="With or without noise to source pcd, default False", default=False)
+    parser.add_argument("--noise", default=False, help="With or without noise to source pcd, default False")
     parser.add_argument("--init_icp", default=o3d.core.Tensor.eye(4, o3d.core.Dtype.Float32), help='o3d.core.Tensor 4*4'
                                                                                                    'Initialization Mat')
     parser.add_argument("--max_iter", type=int, default=50, help="Iteration Number")
@@ -261,25 +261,29 @@ def main():
     target = o3d.io.read_point_cloud(params.target_dir)
     if params.noise:
         print("Introducing Noise")
-        source.translate(np.asarray([1.12, 1.55, -1.1]))
-        source.rotate(rot_mat, center=source.get_center())
-        source.scale(scale=1.1, center=source.get_center())
+        #source.translate(np.asarray([1.12, 1.55, -1.1]))
+        #source.rotate(rot_mat, center=source.get_center())
+        source.scale(scale=1.5, center=source.get_center())
     if params.registration == "global":
         print("Executing Global Registration")
         global_trans_mat = execute_global_reg(source, target, params)
         print("Final Transformation Matrix", global_trans_mat)
+        return global_trans_mat
     if params.registration == "fast":
         print("Executing Fast Global Registration")
         fast_trans_mat = execute_global_fast_reg(source, target, params)
         print("Final Transformation Matrix", fast_trans_mat)
+        return fast_trans_mat
     if params.registration == "icp":
         print("Executing ICP Registration")
         icp_trans_mat = execute_local_icp_reg(source, target, params)
         print("Final Transformation Matrix", icp_trans_mat)
+        return icp_trans_mat
     if params.registration == "global_icp":
         print("Global and Local Registration")
         global_trans_mat = global_icp(source, target, params)
         print("Final Transformation Matrix", global_trans_mat)
+        return global_trans_mat
 
 if __name__ == "__main__":
     main()
