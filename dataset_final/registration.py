@@ -104,13 +104,13 @@ def execute_global_fast_reg(source, target, params):
 def execute_global_reg(source, target, params):
     # GLOBAL REGISTRATION
     draw_registration_result(source, target, np.identity(4))
-    source_cp = copy.deepcopy(source)
-    target_cp = copy.deepcopy(target)
+    # source_cp = copy.deepcopy(source)
+    # target_cp = copy.deepcopy(target)
     start = time.time()
     voxel_size = params.voxel_size
     distance_threshold = voxel_size * 8.5
     # Data Preprocessing and feature calculation
-    source, target, source_down, target_down, source_fpfh, target_fpfh = prepare_dataset(source_cp, target_cp,
+    source, target, source_down, target_down, source_fpfh, target_fpfh = prepare_dataset(source, target,
                                                                                          voxel_size)
     print(":: Apply global registration with distance threshold %.3f"
           % distance_threshold)
@@ -130,9 +130,9 @@ def execute_global_reg(source, target, params):
     print(result)
     # Drawing registration result
     draw_registration_result(source, target, result.transformation)
-    source_cp.transform(result.transformation)
+    source.transform(result.transformation)
     # Error Distribution
-    registration_histogram(source_cp, target_cp, params)
+    registration_histogram(source, target, params)
     return result.transformation
 
 ################################ RANSAC BASED GLOBAL REGISTRATION END #################################################
@@ -180,9 +180,9 @@ def execute_local_icp_reg(source, target, params):
     print("ICP Local registration took %.3f sec.\n" % (time.time() - start))
     reg = registration_ms_icp.transformation.numpy()
     draw_registration_result(source, target, reg)
-    source_cp = copy.deepcopy(source)
-    source_cp.transform(reg)
-    registration_histogram(source_cp, target, params)
+    #source_cp = copy.deepcopy(source)
+    source.transform(reg)
+    registration_histogram(source, target, params)
     return reg
 
 
@@ -191,11 +191,11 @@ def execute_local_icp_reg(source, target, params):
 ###################### GLOBAL(RANSAC) + lOCAL(ICP POINT TO PLANE) BASED  REGISTRATION START ###########################
 def global_icp(source, target, params):
     draw_registration_result(source, target, np.identity(4))
-    source_cp = copy.deepcopy(source)
-    target_cp = copy.deepcopy(target)
+    # source_cp = copy.deepcopy(source)
+    # target_cp = copy.deepcopy(target)
     voxel_size = params.voxel_size
     distance_threshold = voxel_size * 8.5
-    source, target, source_down, target_down, source_fpfh, target_fpfh = prepare_dataset(source_cp, target_cp,
+    source, target, source_down, target_down, source_fpfh, target_fpfh = prepare_dataset(source, target,
                                                                                          voxel_size)
     print(":: Apply global registration with distance threshold %.3f"
           % distance_threshold)
@@ -250,9 +250,9 @@ def global_icp(source, target, params):
     print("ICP Local registration took %.3f sec.\n" % (time.time() - start))
     reg = registration_ms_icp.transformation.numpy()
     draw_registration_result(source, target, reg)
-    source_cp = copy.deepcopy(source)
-    source_cp.transform(reg)
-    registration_histogram(source_cp, target, params)
+    # source_cp = copy.deepcopy(source)
+    source.transform(reg)
+    registration_histogram(source, target, params)
     return reg
 ###################### GLOBAL(RANSAC) + lOCAL(ICP POINT TO PLANE) BASED  REGISTRATION END ############################
 

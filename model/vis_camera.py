@@ -112,17 +112,18 @@ def visualize_multi_camera(xyzs, label_name, mode="3d", filename=0):
     plt.show()
 
 
-def main(camera_sets, labels, shift=False):
+def main(camera_sets, labels, shift = False):
     camera_xyz = []
     for idx in range(len(camera_sets)):
+        #camera_set = camera.main(camera_xml[idx], opencv_xml[idx])
         camera_set = camera_sets[idx]
         xyz_1 = pose2xyz(camera_set, shift)
         camera_xyz.append(xyz_1)
         visualize_camera(xyz_1, "2d", filename = labels[idx])
         visualize_camera(xyz_1, "3d", filename = labels[idx])
-    if len(xyz_1) > 1:
-        visualize_multi_camera(camera_xyz, labels, "2d", "transformed_camera")
-        visualize_multi_camera(camera_xyz, labels, "3d", "transformed_camera")
+    if len(xyz_1)>1:
+        visualize_multi_camera(camera_xyz, labels, "2d", "camera")
+        visualize_multi_camera(camera_xyz, labels, "3d", "camera")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
