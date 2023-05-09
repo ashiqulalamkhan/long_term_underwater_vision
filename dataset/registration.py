@@ -7,28 +7,7 @@ import argparse
 from scipy.spatial.transform import Rotation as R
 
 
-def parse_args():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--source_dir", default="/home/turin/Desktop/lizard_dataset_curated/2016/pcd16.pcd", type=str,
-                        help="Source Pcd Directory")
-    parser.add_argument("--target_dir", default="/home/turin/Desktop/lizard_dataset_curated/2015/pcd15.pcd", type=str,
-                        help="Target Pcd Directory")
-    parser.add_argument("registration", type=str, default='global_icp', help="Either 'fast', 'global', 'global_icp' or 'icp'")
-    parser.add_argument("--voxel_size", type=float, default=0.1, help="User Defined Voxel_size 0.05 means 5cm for this "
-                                                                      "dataset, initial value = .1m")
-    parser.add_argument("--distance_threshold_mult", type=float, default=1.5, help="distance_threshold multiplier to "
-                                                                                   "voxel size")
-    parser.add_argument("--noise", default=False, help="With or without noise to source pcd, default False")
-    parser.add_argument("--init_icp", default=o3d.core.Tensor.eye(4, o3d.core.Dtype.Float32), help='o3d.core.Tensor 4*4'
-                                                                                                   'Initialization Mat')
-    parser.add_argument("--max_iter", type=int, default=50, help="Iteration Number")
-    parser.add_argument("--max_corr_dist", type=float, default=2.0, help="ICP max_correspondence_distances ")
-    parser.add_argument("--hist", type=str, default="True", help="Histogram 'True','False' default:'True'")
-    parser.add_argument("--hist_bins", type=int, default=1000, help="Histogram bin Number")
-    args = parser.parse_args()
-    return args
-
-
+# VISUALIZING THE POINT CLOUDS
 def draw_registration_result(source, target, transformation):
     source_temp = copy.deepcopy(source)
     target_temp = copy.deepcopy(target)
@@ -38,6 +17,7 @@ def draw_registration_result(source, target, transformation):
     o3d.visualization.draw_geometries([source_temp, target_temp])
 
 
+# HISTOGRAM FOR ERROR DISTRIBUTION
 def registration_histogram(source, target, params):
     dist_error = source.compute_point_cloud_distance(target)
     error = []
@@ -60,6 +40,7 @@ def registration_histogram(source, target, params):
         plt.show()
 
 
+# DOWN SIZING THE POINT CLOUD AND ESTIMATING ITS FPFH
 def preprocess_point_cloud(pcd, voxel_size):
     print(":: Downsample with a voxel size %.3f." % voxel_size)
     pcd_down = pcd.voxel_down_sample(voxel_size)
@@ -77,6 +58,7 @@ def preprocess_point_cloud(pcd, voxel_size):
     return pcd_down, pcd_fpfh
 
 
+# PREPROCESSING THE DATASET
 def prepare_dataset(source, target, voxel_size):
     print(":: Load two point clouds with initial pose.")
     source_down, source_fpfh = preprocess_point_cloud(source, voxel_size)
@@ -84,6 +66,7 @@ def prepare_dataset(source, target, voxel_size):
     return source, target, source_down, target_down, source_fpfh, target_fpfh
 
 
+###################################### FAST GLOBAL REGISTRATION START ##################################################
 def execute_global_fast_reg(source, target, params):
     # FAST GLOBAL REGISTRATION
     draw_registration_result(source, target, np.identity(4))
@@ -108,6 +91,10 @@ def execute_global_fast_reg(source, target, params):
     return result.transformation
 
 
+###################################### FAST GLOBAL REGISTRATION END ##################################################
+
+
+################################ RANSAC BASED GLOBAL REGISTRATION START ##############################################
 def execute_global_reg(source, target, params):
     # GLOBAL REGISTRATION
     draw_registration_result(source, target, np.identity(4))
@@ -116,10 +103,12 @@ def execute_global_reg(source, target, params):
     start = time.time()
     voxel_size = params.voxel_size
     distance_threshold = voxel_size * 8.5
+    # Data Preprocessing and feature calculation
     source, target, source_down, target_down, source_fpfh, target_fpfh = prepare_dataset(source_cp, target_cp,
                                                                                          voxel_size)
     print(":: Apply global registration with distance threshold %.3f"
           % distance_threshold)
+    # Global RANSAC based registration
     result = o3d.pipelines.registration.registration_ransac_based_on_feature_matching(
         source_down, target_down, source_fpfh, target_fpfh, True,
         distance_threshold,
@@ -128,17 +117,21 @@ def execute_global_reg(source, target, params):
             o3d.pipelines.registration.CorrespondenceCheckerBasedOnEdgeLength(
                 0.9),
             o3d.pipelines.registration.CorrespondenceCheckerBasedOnDistance(
-                8.5*.1)
+                8.5 * .1)
         ],
         criteria=o3d.pipelines.registration.RANSACConvergenceCriteria(1000000, 1.0))
     print("Global registration took %.3f sec.\n" % (time.time() - start))
     print(result)
+    # Drawing registration result
     draw_registration_result(source, target, result.transformation)
     source_cp.transform(result.transformation)
+    # Error Distribution
     registration_histogram(source_cp, target_cp, params)
     return result.transformation
 
+################################ RANSAC BASED GLOBAL REGISTRATION END #################################################
 
+########################## ICP POINT TO PLANE BASED LOCAL REGISTRATION START ##########################################
 def execute_local_icp_reg(source, target, params):
     # 'Returns np 4*4 transformation matrix'
     device = o3d.core.Device("CPU:0")
@@ -160,7 +153,7 @@ def execute_local_icp_reg(source, target, params):
     max_correspondence_distances = o3d.utility.DoubleVector(
         [params.max_corr_dist, params.max_corr_dist * 0.5, params.max_corr_dist * 0.25])
 
-    loss = treg.robust_kernel.RobustKernel(treg.robust_kernel.RobustKernelMethod.TukeyLoss,1.0)
+    loss = treg.robust_kernel.RobustKernel(treg.robust_kernel.RobustKernelMethod.TukeyLoss, 1.0)
     estimation = treg.TransformationEstimationPointToPlane(loss)
 
     # Save iteration wise `fitness`, `inlier_rmse`, etc. to analyse and tune result.
@@ -184,9 +177,12 @@ def execute_local_icp_reg(source, target, params):
     source_cp = copy.deepcopy(source)
     source_cp.transform(reg)
     registration_histogram(source_cp, target, params)
-    return registration_ms_icp.transformation.numpy()
+    return reg
 
-#
+
+########################## ICP POINT TO PLANE BASED LOCAL REGISTRATION END ############################################
+
+###################### GLOBAL(RANSAC) + lOCAL(ICP POINT TO PLANE) BASED  REGISTRATION START ###########################
 def global_icp(source, target, params):
     draw_registration_result(source, target, np.identity(4))
     source_cp = copy.deepcopy(source)
@@ -248,21 +244,21 @@ def global_icp(source, target, params):
     print("ICP Local registration took %.3f sec.\n" % (time.time() - start))
     reg = registration_ms_icp.transformation.numpy()
     draw_registration_result(source, target, reg)
-    # source_cp = copy.deepcopy(source)
-    # source_cp.transform(reg)
-    # registration_histogram(source_cp, target, params)
-    return registration_ms_icp.transformation.numpy()
+    source_cp = copy.deepcopy(source)
+    source_cp.transform(reg)
+    registration_histogram(source_cp, target, params)
+    return reg
+###################### GLOBAL(RANSAC) + lOCAL(ICP POINT TO PLANE) BASED  REGISTRATION END ############################
 
-def main():
-    r = R.from_rotvec([np.pi / 9, 0, np.pi / 9])
-    rot_mat = r.as_matrix().reshape(3, 3)
-    params = parse_args()
+def main(params):
     source = o3d.io.read_point_cloud(params.source_dir)
     target = o3d.io.read_point_cloud(params.target_dir)
     if params.noise:
         print("Introducing Noise")
-        #source.translate(np.asarray([1.12, 1.55, -1.1]))
-        #source.rotate(rot_mat, center=source.get_center())
+        r = R.from_rotvec([np.pi / 9, 0, np.pi / 9])
+        rot_mat = r.as_matrix().reshape(3, 3)
+        source.translate(np.asarray([1.12, 1.55, -1.1]))
+        source.rotate(rot_mat, center=source.get_center())
         source.scale(scale=1.5, center=source.get_center())
     if params.registration == "global":
         print("Executing Global Registration")
@@ -285,5 +281,44 @@ def main():
         print("Final Transformation Matrix", global_trans_mat)
         return global_trans_mat
 
+
+class Params:
+    def __init__(self, source_dir="/home/turin/Desktop/lizard_dataset_curated/2015/pcd15.pcd",
+                 target_dir="/home/turin/Desktop/lizard_dataset_curated/2014/pcd14.pcd", registration='global_icp',
+                 voxel_size=0.1, distance_threshold_mult=1.5, noise=False,
+                 init_icp=o3d.core.Tensor.eye(4, o3d.core.Dtype.Float32), max_iter=50, max_corr_dist=2.0, hist=True,
+                 hist_bins=1000):
+        self.source_dir = source_dir
+        self.target_dir = target_dir
+        self.registration = registration
+        self.voxel_size = voxel_size
+        self.distance_threshold_mult = distance_threshold_mult
+        self.noise = noise
+        self.init_icp = init_icp
+        self.max_iter = max_iter
+        self.max_corr_dist = max_corr_dist
+        self.hist = hist
+        self.hist_bins = hist_bins
+
+
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--source_dir", default="/home/turin/Desktop/lizard_dataset_curated/2015/pcd15.pcd", type=str,
+                        help="Source Pcd Directory")
+    parser.add_argument("--target_dir", default="/home/turin/Desktop/lizard_dataset_curated/2014/pcd14.pcd", type=str,
+                        help="Target Pcd Directory")
+    parser.add_argument("registration", type=str, default='global_icp',
+                        help="Either 'fast', 'global', 'global_icp' or 'icp'")
+    parser.add_argument("--voxel_size", type=float, default=0.1, help="User Defined Voxel_size 0.05 means 5cm for this "
+                                                                      "dataset, initial value = .1m")
+    parser.add_argument("--distance_threshold_mult", type=float, default=1.5, help="distance_threshold multiplier to "
+                                                                                   "voxel size")
+    parser.add_argument("--noise", default=False, help="With or without noise to source pcd, default False")
+    parser.add_argument("--init_icp", default=o3d.core.Tensor.eye(4, o3d.core.Dtype.Float32), help='o3d.core.Tensor 4*4'
+                                                                                                   'Initialization Mat')
+    parser.add_argument("--max_iter", type=int, default=50, help="Iteration Number")
+    parser.add_argument("--max_corr_dist", type=float, default=2.0, help="ICP max_correspondence_distances ")
+    parser.add_argument("--hist", type=str, default="True", help="Histogram 'True','False' default:'True'")
+    parser.add_argument("--hist_bins", type=int, default=1000, help="Histogram bin Number")
+    args = parser.parse_args()
+    main(args)

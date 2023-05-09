@@ -23,7 +23,7 @@ def camera_transformation(visualize=False):
     print("Registration DONE")
 
     #VISUALIZATION
-    #GLOBAL SHIFT ACCORDING TO POINTCLOUD SHIFT
+    #GLOBAL SHIFT ACCORDING TO POINTCLOUD SHIFT USED IN THE APP WHILE EXPORTING PCDS
     shift = np.asarray([332400, 8375600, 0.0])
     #CAMERA FILES
     camera14_xml = "/home/turin/Desktop/lizard_dataset_curated/2014/cam14.xml"
@@ -33,23 +33,30 @@ def camera_transformation(visualize=False):
     #FOR CAMERA14
     camera_ref14 = camera.CameraRef(camera14_xml, opencv_xml)
     camera14_set = []
+    camera14_class = []
     for idx in range(len(camera_ref14.camera_dict)):
         camera14 = camera.Camera(camera_ref14.camera_dict[idx], camera_ref14.local2global, shift=shift)
         camera14_set.append(camera14.get_camera_set())
+        camera14_class.append(camera14)
 
     #FOR CAMERA15
     camera_ref15 = camera.CameraRef(camera15_xml, opencv_xml)
     camera15_set = []
+    camera15_class = []
     for idx in range(len(camera_ref15.camera_dict)):
         camera15 = camera.Camera(camera_ref15.camera_dict[idx], camera_ref15.local2global, trans_mat_15_14, shift=shift)
         camera15_set.append(camera15.get_camera_set())
+        camera15_class.append(camera15)
 
     #FOR CAMERA16
     camera_ref16 = camera.CameraRef(camera16_xml, opencv_xml)
     camera16_set = []
+    camera16_class = []
     for idx in range(len(camera_ref16.camera_dict)):
         camera16 = camera.Camera(camera_ref16.camera_dict[idx], camera_ref16.local2global, trans_mat_16_14, shift=shift)
         camera16_set.append(camera16.get_camera_set())
+        camera16_class.append(camera16)
+
     print("CAMERA DATA Preproccesing Done")
     if visualize:
         #INITIAL POINCLOUD:
@@ -71,5 +78,5 @@ def camera_transformation(visualize=False):
         camera_sets = [camera14_set, camera15_set, camera16_set]
         labels = ["Transformed camera 14", "Transformed camera 15", "Transformed camera 16"]
         vis_camera.main(camera_sets, labels, False)
-    return camera14_set, camera15_set, camera16_set
+    return camera14_set, camera15_set, camera16_set, camera14_class, camera15_class, camera16_class
 

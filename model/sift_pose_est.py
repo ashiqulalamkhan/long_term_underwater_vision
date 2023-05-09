@@ -98,7 +98,7 @@ def sift(img1, img2, show=False):
     # matches = flann.knnMatch(des1,des2,k=2)
     # Filter out the matches based on the ratio test
     thres = 0.15
-    for itr in range(2,6):
+    for itr in range(2,7):
         good_matches = []
         for m, n in matches:
             if m.distance < thres * n.distance:
